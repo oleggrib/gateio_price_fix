@@ -4,9 +4,9 @@ const dotenv = require("dotenv");
 
 dotenv.config();
 
-const IDLE_TIMOUT_IN_MINUTES = 1;
+const IDLE_TIMOUT_IN_SECONDS = 20;
 const API_MIN_ORDER_USDT = 3;
-const CHECK_INTERVAL_IN_SECONDS = 30;
+const CHECK_INTERVAL_IN_SECONDS = 20;
 const DIFFERENCE_THRESHOLD = 0.00015; // if last price is 0.1510 but ask is 0.1511, then make a buy order, approx 0.1%
 
 const apiKey = process.env.GATEIO_API_KEY;
@@ -20,6 +20,10 @@ client.setApiKeySecret(apiKey, apiSecret);
 
 // const api = new GateApi.AccountApi(client);
 const api = new GateApi.SpotApi(client);
+
+let prevMsg, newMsg;
+let lastLineWasMinutes = false;
+let tradeMsg, lastTradeMsg;
 
 class GateioAPI {
 	constructor() {
@@ -153,7 +157,7 @@ async function main() {
 		const lastTrade = await gateio.getLastPrice(symbol);
 		// console.log(`Price: ${lastTrade.price}`);
 		const timePassed = Math.floor(
-			(Date.now() - lastTrade.timestamp) / 1000 / 60
+			(Date.now() - lastTrade.timestamp) / 1000
 		);
 		// console.log(`Last trade time: ${new Date(lastTrade.timestamp).toISOString()}`);
 
@@ -161,14 +165,21 @@ async function main() {
 		const orderBook = await gateio.getOrderBook(symbol);
 
 		const priceDifference = orderBook.asks[0].price - lastTrade.price;
-        const readyToBuy = timePassed >= IDLE_TIMOUT_IN_MINUTES && priceDifference > DIFFERENCE_THRESHOLD;
+        const readyToBuy = timePassed >= IDLE_TIMOUT_IN_SECONDS && priceDifference > DIFFERENCE_THRESHOLD;
+        
+        tradeMsg = `\nLast trade price ${Math.floor(lastTrade.price * 10000) / 10000} USD`
+        if (tradeMsg !== lastTradeMsg) {
+            // console.log({tradeMsg, lastTradeMsg})
+            console.log(tradeMsg);
+            lastTradeMsg = tradeMsg;
+        }
         if (!readyToBuy) {
-            console.log(`Last trade was ${timePassed} min ago with price ${Math.floor(lastTrade.price * 10000) / 10000} USD, min sell price ${orderBook.asks[0].price} is not higher enough`);
+            process.stdout.write(`\rTrade was ${timePassed} sec ago.. min sell price ${orderBook.asks[0].price} is not high enough`)
         } else {
-            console.warn(`Last trade was ${timePassed} min ago with price ${Math.floor(lastTrade.price * 10000) / 10000} USD, we can buy for ${orderBook.asks[0].price} to increase price`);
-			console.log(
-				`Minimal sell order use higher than market price! Lets buy SLN for 3 USD (minimal amount for API)`
-			);
+            console.warn(`\nLast trade was ${timePassed} sec ago with price ${Math.floor(lastTrade.price * 10000) / 10000} USD, we can buy for ${orderBook.asks[0].price} to increase price`);
+			// console.log(
+			// 	`Minimal sell order use higher than market price! Lets buy SLN for 3 USD (minimal amount for API)`
+			// );
 			try {
 
 				
