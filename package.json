@@ -1,6 +1,7 @@
 {
   "scripts": {
-    "start": "node orders.js"
+    "start": "node orders.js",
+    "kucoin": "node kucoin.js"
   },
   "dependencies": {
     "axios": "^1.7.9",
